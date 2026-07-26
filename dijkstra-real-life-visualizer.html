@@ -1,0 +1,1518 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Dijkstra Real-Life Visualizer</title>
+  <style>
+    :root {
+      --bg: #07111f;
+      --panel: rgba(11, 24, 42, 0.84);
+      --panel-strong: rgba(14, 30, 52, 0.96);
+      --line: rgba(156, 184, 255, 0.18);
+      --text: #e7eefc;
+      --muted: #9db0d0;
+      --accent: #58d6ff;
+      --accent-2: #7b7cff;
+      --success: #47e4a1;
+      --warn: #ffd166;
+      --danger: #ff6b81;
+      --road: #32445f;
+      --road-glow: #7ccfff;
+      --node: #132841;
+      --node-border: #6fbaff;
+      --shadow: 0 18px 40px rgba(0, 0, 0, 0.35);
+      --radius: 22px;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      color: var(--text);
+      font-family: "Inter", "Segoe UI", system-ui, sans-serif;
+      background:
+        radial-gradient(circle at top left, rgba(88, 214, 255, 0.18), transparent 28%),
+        radial-gradient(circle at top right, rgba(123, 124, 255, 0.18), transparent 30%),
+        linear-gradient(180deg, #08111d 0%, #091525 100%);
+      overflow-x: hidden;
+      overflow-y: auto;
+    }
+
+    .shell {
+      display: grid;
+      grid-template-columns: 360px minmax(0, 1fr) 320px;
+      min-height: 100vh;
+      gap: 18px;
+      padding: 18px;
+      align-items: start;
+    }
+
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(16px);
+    }
+
+    .left,
+    .right {
+      padding: 18px;
+      overflow: auto;
+      max-height: calc(100vh - 36px);
+    }
+
+    .center {
+      position: relative;
+      overflow: hidden;
+      min-height: 760px;
+      background:
+        linear-gradient(rgba(88, 214, 255, 0.06) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(88, 214, 255, 0.06) 1px, transparent 1px),
+        radial-gradient(circle at 30% 20%, rgba(88, 214, 255, 0.18), transparent 35%),
+        linear-gradient(180deg, rgba(12, 25, 45, 0.96), rgba(9, 17, 30, 0.98));
+      background-size: 34px 34px, 34px 34px, auto, auto;
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: center;
+      margin-bottom: 18px;
+    }
+
+    h1, h2, h3, p {
+      margin: 0;
+    }
+
+    h1 {
+      font-size: 1.35rem;
+      letter-spacing: 0.02em;
+    }
+
+    h2 {
+      font-size: 0.9rem;
+      text-transform: uppercase;
+      color: var(--muted);
+      letter-spacing: 0.14em;
+      margin-bottom: 12px;
+    }
+
+    .sub {
+      color: var(--muted);
+      font-size: 0.93rem;
+      line-height: 1.45;
+    }
+
+    .stack {
+      display: grid;
+      gap: 16px;
+    }
+
+    .card {
+      padding: 16px;
+      border-radius: 18px;
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid rgba(156, 184, 255, 0.12);
+    }
+
+    .controls {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 10px;
+    }
+
+    button,
+    select,
+    input,
+    textarea {
+      width: 100%;
+      border: 1px solid rgba(156, 184, 255, 0.18);
+      border-radius: 14px;
+      background: rgba(8, 18, 32, 0.82);
+      color: var(--text);
+      font: inherit;
+    }
+
+    button {
+      padding: 11px 12px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: transform 0.18s ease, border-color 0.18s ease, background 0.18s ease;
+    }
+
+    button:hover {
+      transform: translateY(-1px);
+      border-color: rgba(88, 214, 255, 0.42);
+      background: rgba(17, 36, 63, 0.9);
+    }
+
+    .primary {
+      background: linear-gradient(135deg, rgba(88, 214, 255, 0.26), rgba(123, 124, 255, 0.28));
+      border-color: rgba(88, 214, 255, 0.45);
+    }
+
+    .ghost {
+      background: rgba(255, 255, 255, 0.03);
+    }
+
+    label {
+      display: block;
+      font-size: 0.82rem;
+      color: var(--muted);
+      margin-bottom: 7px;
+    }
+
+    input,
+    select,
+    textarea {
+      padding: 10px 12px;
+    }
+
+    textarea {
+      min-height: 120px;
+      resize: vertical;
+      font-family: "Cascadia Code", "Consolas", monospace;
+      font-size: 0.88rem;
+      line-height: 1.5;
+    }
+
+    .row2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 12px;
+      border-radius: 999px;
+      font-size: 0.82rem;
+      color: var(--muted);
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid rgba(156, 184, 255, 0.11);
+    }
+
+    .dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: var(--accent);
+      box-shadow: 0 0 12px currentColor;
+    }
+
+    .legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .status-banner {
+      position: absolute;
+      top: 18px;
+      left: 18px;
+      right: 18px;
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 14px 16px;
+      border-radius: 18px;
+      background: rgba(7, 17, 31, 0.74);
+      border: 1px solid rgba(88, 214, 255, 0.18);
+      backdrop-filter: blur(10px);
+      z-index: 3;
+    }
+
+    .status-main {
+      font-weight: 700;
+      font-size: 0.98rem;
+    }
+
+    .status-sub {
+      color: var(--muted);
+      font-size: 0.88rem;
+      margin-top: 4px;
+    }
+
+    .map-wrap {
+      position: absolute;
+      inset: 0;
+      padding: 82px 18px 18px;
+      perspective: 1600px;
+      overflow: auto;
+    }
+
+    .map-stage {
+      width: 100%;
+      height: 100%;
+      min-height: 620px;
+      transform-style: preserve-3d;
+      transition: transform 260ms ease;
+      cursor: grab;
+      user-select: none;
+      position: relative;
+    }
+
+    .map-3d-layer {
+      position: absolute;
+      inset: 0;
+    }
+
+    .map-3d-layer svg {
+      transform:
+        rotateX(var(--tilt-x, 64deg))
+        rotateZ(var(--tilt-z, -16deg))
+        translateZ(var(--lift-z, 0px))
+        scale(var(--map-scale, 0.98));
+      transform-origin: 50% 50%;
+      transition: transform 260ms ease;
+      filter:
+        drop-shadow(0 34px 46px rgba(0, 0, 0, 0.42))
+        drop-shadow(0 10px 20px rgba(88, 214, 255, 0.12));
+    }
+
+    .ground-shadow {
+      fill: rgba(0, 0, 0, 0.28);
+      filter: blur(8px);
+    }
+
+    .ground-plane {
+      fill: url(#groundGradient);
+      stroke: rgba(123, 184, 255, 0.12);
+      stroke-width: 2;
+    }
+
+    .ground-grid {
+      stroke: rgba(123, 184, 255, 0.08);
+      stroke-width: 1.2;
+    }
+
+    svg {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+
+    .road-shadow {
+      stroke: rgba(0, 0, 0, 0.24);
+      stroke-width: 20;
+      stroke-linecap: round;
+    }
+
+    .road-wall {
+      fill: rgba(20, 37, 58, 0.95);
+      stroke: rgba(92, 126, 170, 0.12);
+      stroke-width: 1;
+    }
+
+    .road-depth {
+      stroke: rgba(16, 34, 58, 0.92);
+      stroke-width: 16;
+      stroke-linecap: round;
+    }
+
+    .road-base {
+      stroke: url(#roadGradient);
+      stroke-width: 14;
+      stroke-linecap: round;
+    }
+
+    .road-active {
+      stroke: var(--road-glow);
+      stroke-width: 8;
+      stroke-linecap: round;
+      fill: none;
+      opacity: 0;
+      filter: drop-shadow(0 0 10px rgba(88, 214, 255, 0.8));
+    }
+
+    .road-final {
+      stroke: var(--success);
+      stroke-width: 12;
+      stroke-linecap: round;
+      fill: none;
+      opacity: 0;
+      filter: drop-shadow(0 0 18px rgba(71, 228, 161, 0.9));
+    }
+
+    .node {
+      cursor: pointer;
+    }
+
+    .node-body {
+      fill: url(#nodeGradient);
+      stroke: var(--node-border);
+      stroke-width: 2.5;
+    }
+
+    .node-base {
+      fill: rgba(0, 0, 0, 0.36);
+    }
+
+    .node-cap {
+      fill: rgba(255, 255, 255, 0.13);
+      opacity: 0.9;
+    }
+
+    .node-column {
+      fill: url(#columnGradient);
+      stroke: rgba(111, 186, 255, 0.22);
+      stroke-width: 1.5;
+    }
+
+    .node-side {
+      fill: url(#nodeSideGradient);
+      stroke: rgba(95, 149, 218, 0.12);
+      stroke-width: 1;
+    }
+
+    .node-rim {
+      fill: none;
+      stroke: rgba(255, 255, 255, 0.12);
+      stroke-width: 1.3;
+    }
+
+    .node.current .node-body {
+      fill: rgba(88, 214, 255, 0.18);
+      stroke: var(--accent);
+      filter: drop-shadow(0 0 14px rgba(88, 214, 255, 0.75));
+    }
+
+    .node.settled .node-body {
+      fill: rgba(71, 228, 161, 0.18);
+      stroke: var(--success);
+    }
+
+    .node.target .node-body {
+      stroke: var(--warn);
+      filter: drop-shadow(0 0 12px rgba(255, 209, 102, 0.52));
+    }
+
+    .node-label {
+      font-weight: 800;
+      font-size: 14px;
+      text-anchor: middle;
+      fill: var(--text);
+      paint-order: stroke fill;
+      stroke: rgba(7, 17, 31, 0.96);
+      stroke-width: 5px;
+      stroke-linejoin: round;
+    }
+
+    .node-distance {
+      font-size: 12px;
+      text-anchor: middle;
+      fill: #d9e7ff;
+      paint-order: stroke fill;
+      stroke: rgba(7, 17, 31, 0.92);
+      stroke-width: 4px;
+      stroke-linejoin: round;
+    }
+
+    .edge-label {
+      font-size: 12px;
+      font-weight: 800;
+      fill: #eef4ff;
+      text-anchor: middle;
+      paint-order: stroke fill;
+      stroke: rgba(7, 17, 31, 0.95);
+      stroke-width: 4px;
+      stroke-linejoin: round;
+    }
+
+    .label-plate {
+      fill: rgba(8, 20, 36, 0.78);
+      stroke: rgba(123, 184, 255, 0.18);
+      stroke-width: 1.2;
+    }
+
+    .distance-plate {
+      fill: rgba(6, 16, 28, 0.86);
+      stroke: rgba(123, 184, 255, 0.14);
+      stroke-width: 1;
+    }
+
+    .edge-plate {
+      fill: rgba(7, 17, 31, 0.82);
+      stroke: rgba(123, 184, 255, 0.18);
+      stroke-width: 1;
+    }
+
+    .vehicle {
+      fill: var(--accent);
+      filter: drop-shadow(0 0 12px rgba(88, 214, 255, 0.95));
+      opacity: 0;
+    }
+
+    .vehicle-trail {
+      fill: rgba(88, 214, 255, 0.12);
+      opacity: 0;
+    }
+
+    .map-hint {
+      position: absolute;
+      right: 24px;
+      bottom: 24px;
+      z-index: 4;
+      pointer-events: none;
+    }
+
+    .focus-ring {
+      fill: none;
+      stroke: rgba(255, 209, 102, 0.88);
+      stroke-width: 3;
+      stroke-dasharray: 5 5;
+      opacity: 0;
+    }
+
+    .table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.88rem;
+    }
+
+    .table th,
+    .table td {
+      padding: 9px 4px;
+      border-bottom: 1px solid rgba(156, 184, 255, 0.1);
+      text-align: left;
+    }
+
+    .state {
+      display: inline-flex;
+      padding: 4px 8px;
+      border-radius: 999px;
+      font-size: 0.76rem;
+      font-weight: 700;
+    }
+
+    .state.current { background: rgba(88, 214, 255, 0.14); color: var(--accent); }
+    .state.settled { background: rgba(71, 228, 161, 0.12); color: var(--success); }
+    .state.pending { background: rgba(255,255,255,0.06); color: var(--muted); }
+
+    .log {
+      display: grid;
+      gap: 10px;
+      max-height: 260px;
+      overflow: auto;
+    }
+
+    .log-item {
+      padding: 10px 12px;
+      border-radius: 14px;
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid rgba(156, 184, 255, 0.1);
+      font-size: 0.86rem;
+      line-height: 1.4;
+    }
+
+    .flow-list {
+      display: grid;
+      gap: 10px;
+    }
+
+    .flow-step {
+      padding: 12px 14px;
+      border-left: 3px solid transparent;
+      border-radius: 14px;
+      background: rgba(255,255,255,0.03);
+      color: var(--muted);
+      font-size: 0.87rem;
+    }
+
+    .flow-step.active {
+      border-left-color: var(--accent);
+      background: rgba(88, 214, 255, 0.1);
+      color: var(--text);
+    }
+
+    .footer-note {
+      font-size: 0.8rem;
+      color: var(--muted);
+      line-height: 1.45;
+    }
+
+    .mini {
+      font-size: 0.78rem;
+      color: var(--muted);
+    }
+
+    @media (max-width: 1280px) {
+      .shell {
+        grid-template-columns: 320px minmax(0, 1fr);
+      }
+
+      .right {
+        grid-column: 1 / -1;
+      }
+    }
+
+    @media (max-width: 900px) {
+      .shell {
+        grid-template-columns: 1fr;
+        min-height: auto;
+      }
+
+      .left,
+      .right {
+        max-height: none;
+        overflow: visible;
+      }
+
+      .center {
+        min-height: 62vh;
+      }
+
+      .status-banner {
+        position: static;
+        margin: 18px 18px 0;
+      }
+
+      .map-wrap {
+        position: static;
+        padding: 18px;
+      }
+
+      .map-stage {
+        min-height: 480px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <aside class="panel left">
+      <div class="header">
+        <div>
+          <h1>Real-Life Dijkstra Visualizer</h1>
+          <p class="sub">Route planning vibe, live flow, editable graph, and cleaner colors.</p>
+        </div>
+      </div>
+
+      <div class="stack">
+        <section class="card">
+          <h2>Playback</h2>
+          <div class="controls">
+            <button id="playBtn" class="primary">Play</button>
+            <button id="stepBtn">Step</button>
+            <button id="resetBtn" class="ghost">Reset</button>
+          </div>
+          <div style="margin-top: 14px;">
+            <label for="speedRange">Speed</label>
+            <input id="speedRange" type="range" min="1" max="10" value="5" />
+          </div>
+          <div style="margin-top: 14px;" class="legend">
+            <span class="pill"><span class="dot" style="color: var(--accent); background: var(--accent);"></span>Current search</span>
+            <span class="pill"><span class="dot" style="color: var(--success); background: var(--success);"></span>Settled route</span>
+            <span class="pill"><span class="dot" style="color: var(--warn); background: var(--warn);"></span>Selected destination</span>
+          </div>
+          <div class="row2" style="margin-top:14px;">
+            <div>
+              <label for="tiltXRange">3D Tilt</label>
+              <input id="tiltXRange" type="range" min="28" max="85" value="64" />
+            </div>
+            <div>
+              <label for="tiltZRange">3D Rotate</label>
+              <input id="tiltZRange" type="range" min="-50" max="50" value="-16" />
+            </div>
+          </div>
+        </section>
+
+        <section class="card">
+          <h2>Graph Input</h2>
+          <div class="row2">
+            <div>
+              <label for="sourceSelect">Source</label>
+              <select id="sourceSelect"></select>
+            </div>
+            <div>
+              <label for="targetSelect">Target</label>
+              <select id="targetSelect"></select>
+            </div>
+          </div>
+          <div style="margin-top: 12px;">
+            <label for="nodesInput">Nodes Input</label>
+            <textarea id="nodesInput"></textarea>
+          </div>
+          <div style="margin-top: 12px;">
+            <label for="edgesInput">Edges Input</label>
+            <textarea id="edgesInput"></textarea>
+          </div>
+          <div class="controls" style="margin-top: 12px;">
+            <button id="applyBtn" class="primary">Apply Graph</button>
+            <button id="presetBtn">Load Preset</button>
+            <button id="focusTargetBtn" class="ghost">Focus Target</button>
+          </div>
+          <p class="mini" style="margin-top: 10px;">Easy format: `A,18,62,Warehouse` and `A,B,4` — one line per item. JSON also works.</p>
+        </section>
+
+        <section class="card">
+          <h2>What is happening</h2>
+          <div id="flowList" class="flow-list"></div>
+        </section>
+      </div>
+    </aside>
+
+    <main class="panel center">
+      <div class="status-banner">
+        <div>
+          <div id="statusMain" class="status-main">Ready to simulate shortest-path routing.</div>
+          <div id="statusSub" class="status-sub">Press play or step through each routing decision.</div>
+        </div>
+        <div style="text-align:right;">
+          <div class="pill" id="routeBadge">Route: --</div>
+          <div class="pill" style="margin-top:8px;" id="distanceBadge">Distance: --</div>
+        </div>
+      </div>
+
+      <div class="map-wrap">
+        <div id="mapStage" class="map-stage">
+          <div class="map-3d-layer">
+            <svg id="mapSvg" viewBox="0 0 1000 700" preserveAspectRatio="xMidYMid meet"></svg>
+          </div>
+        </div>
+        <div class="pill map-hint" id="dragHint">Drag map to rotate</div>
+      </div>
+    </main>
+
+    <aside class="panel right">
+      <div class="stack">
+        <section class="card">
+          <h2>Routing Table</h2>
+          <table class="table">
+            <thead>
+              <tr>
+                <th>Node</th>
+                <th>Distance</th>
+                <th>Prev</th>
+                <th>State</th>
+              </tr>
+            </thead>
+            <tbody id="tableBody"></tbody>
+          </table>
+        </section>
+
+        <section class="card">
+          <h2>Live Log</h2>
+          <div id="logBox" class="log"></div>
+        </section>
+
+        <section class="card">
+          <h2>Tips</h2>
+          <p class="footer-note">
+            Click any node after the algorithm finishes to inspect its shortest route. You can also paste your own graph and re-run the visualization instantly.
+          </p>
+        </section>
+      </div>
+    </aside>
+  </div>
+
+  <script>
+    const DEFAULT_NODES = [
+      { id: "A", x: 16, y: 62, label: "Warehouse" },
+      { id: "B", x: 30, y: 30, label: "North Hub" },
+      { id: "C", x: 31, y: 77, label: "South Hub" },
+      { id: "D", x: 48, y: 21, label: "Tech Park" },
+      { id: "E", x: 52, y: 50, label: "Central City" },
+      { id: "F", x: 50, y: 85, label: "River Port" },
+      { id: "G", x: 71, y: 32, label: "Airport" },
+      { id: "H", x: 73, y: 69, label: "Market" },
+      { id: "I", x: 88, y: 50, label: "Customer" }
+    ];
+
+    const DEFAULT_EDGES = [
+      ["A","B",4], ["A","C",2], ["B","D",5], ["B","E",10], ["C","E",3],
+      ["C","F",8], ["D","E",2], ["D","G",4], ["E","G",6], ["E","H",7],
+      ["F","E",1], ["F","H",2], ["G","I",5], ["H","I",3]
+    ];
+
+    const WORKFLOW_STEPS = [
+      { key: "init", text: "Initialize source distance as 0 and others as infinity." },
+      { key: "select", text: "Pick the unvisited node with the smallest known cost." },
+      { key: "consider", text: "Explore connected roads and compute candidate costs." },
+      { key: "update", text: "If a better route is found, update distance and previous node." },
+      { key: "finalize", text: "Mark the current node as settled because its shortest route is confirmed." },
+      { key: "done", text: "Reconstruct the best route to any selected destination." }
+    ];
+
+    const els = {
+      playBtn: document.getElementById("playBtn"),
+      stepBtn: document.getElementById("stepBtn"),
+      resetBtn: document.getElementById("resetBtn"),
+      applyBtn: document.getElementById("applyBtn"),
+      presetBtn: document.getElementById("presetBtn"),
+      focusTargetBtn: document.getElementById("focusTargetBtn"),
+      speedRange: document.getElementById("speedRange"),
+      tiltXRange: document.getElementById("tiltXRange"),
+      tiltZRange: document.getElementById("tiltZRange"),
+      nodesInput: document.getElementById("nodesInput"),
+      edgesInput: document.getElementById("edgesInput"),
+      sourceSelect: document.getElementById("sourceSelect"),
+      targetSelect: document.getElementById("targetSelect"),
+      tableBody: document.getElementById("tableBody"),
+      logBox: document.getElementById("logBox"),
+      flowList: document.getElementById("flowList"),
+      statusMain: document.getElementById("statusMain"),
+      statusSub: document.getElementById("statusSub"),
+      routeBadge: document.getElementById("routeBadge"),
+      distanceBadge: document.getElementById("distanceBadge"),
+      mapSvg: document.getElementById("mapSvg"),
+      mapStage: document.getElementById("mapStage"),
+      dragHint: document.getElementById("dragHint")
+    };
+
+    const state = {
+      nodes: [],
+      edges: [],
+      source: "A",
+      target: "I",
+      events: [],
+      stepIndex: 0,
+      playing: false,
+      timer: null,
+      vehicleOffset: 0,
+      selectedNode: null,
+      lastFocusNode: null,
+      tiltX: 64,
+      tiltZ: -16,
+      mapScale: 0.96,
+      liftZ: 0,
+      drag: {
+        active: false,
+        startX: 0,
+        startY: 0,
+        startTiltX: 64,
+        startTiltZ: -16
+      }
+    };
+
+    function applyStageTransform() {
+      els.mapStage.style.setProperty("--tilt-x", `${state.tiltX}deg`);
+      els.mapStage.style.setProperty("--tilt-z", `${state.tiltZ}deg`);
+      els.mapStage.style.setProperty("--map-scale", state.mapScale);
+      els.mapStage.style.setProperty("--lift-z", `${state.liftZ}px`);
+      els.tiltXRange.value = String(Math.round(state.tiltX));
+      els.tiltZRange.value = String(Math.round(state.tiltZ));
+    }
+
+    function clamp(value, min, max) {
+      return Math.min(max, Math.max(min, value));
+    }
+
+    function showDragHint(message) {
+      if (!els.dragHint) return;
+      els.dragHint.textContent = message;
+      els.dragHint.style.opacity = "1";
+    }
+
+    function deepClone(value) {
+      return JSON.parse(JSON.stringify(value));
+    }
+
+    function initializeInputs() {
+      els.nodesInput.value = formatNodesForInput(DEFAULT_NODES);
+      els.edgesInput.value = formatEdgesForInput(DEFAULT_EDGES);
+    }
+
+    function formatNodesForInput(nodes) {
+      return nodes.map((node) => [node.id, node.x, node.y, node.label || node.id].join(", ")).join("\n");
+    }
+
+    function formatEdgesForInput(edges) {
+      return edges.map((edge) => edge.join(", ")).join("\n");
+    }
+
+    function parseMaybeJson(text) {
+      const trimmed = text.trim();
+      if (!trimmed) return [];
+      if (trimmed.startsWith("[") || trimmed.startsWith("{")) {
+        return JSON.parse(trimmed);
+      }
+      return null;
+    }
+
+    function parseNodesInput(text) {
+      const maybeJson = parseMaybeJson(text);
+      if (maybeJson) return normalizeNodes(maybeJson);
+      return normalizeNodes(
+        text
+          .split(/\r?\n/)
+          .map((line) => line.trim())
+          .filter(Boolean)
+          .map((line, index) => {
+            const [id, x, y, ...labelParts] = line.split(",").map((part) => part.trim());
+            return { id: id || `N${index + 1}`, x, y, label: labelParts.join(", ") || id };
+          })
+      );
+    }
+
+    function parseEdgesInput(text) {
+      const maybeJson = parseMaybeJson(text);
+      if (maybeJson) return normalizeEdges(maybeJson);
+      return normalizeEdges(
+        text
+          .split(/\r?\n/)
+          .map((line) => line.trim())
+          .filter(Boolean)
+          .map((line) => {
+            const [from, to, weight] = line.split(",").map((part) => part.trim());
+            return [from, to, weight];
+          })
+      );
+    }
+
+    function normalizeNodes(rawNodes) {
+      return rawNodes.map((node, index) => ({
+        id: String(node.id || `N${index + 1}`).trim(),
+        x: Number(node.x),
+        y: Number(node.y),
+        label: node.label ? String(node.label) : String(node.id || `N${index + 1}`)
+      }));
+    }
+
+    function normalizeEdges(rawEdges) {
+      return rawEdges.map((edge) => [String(edge[0]).trim(), String(edge[1]).trim(), Number(edge[2])]);
+    }
+
+    function validateGraph(nodes, edges) {
+      if (!Array.isArray(nodes) || !nodes.length) throw new Error("Nodes JSON is empty.");
+      if (!Array.isArray(edges) || !edges.length) throw new Error("Edges JSON is empty.");
+
+      const ids = new Set();
+      nodes.forEach((node) => {
+        if (!node.id) throw new Error("Every node needs an id.");
+        if (ids.has(node.id)) throw new Error(`Duplicate node id: ${node.id}`);
+        if (!Number.isFinite(node.x) || !Number.isFinite(node.y)) throw new Error(`Node ${node.id} needs numeric x/y.`);
+        ids.add(node.id);
+      });
+
+      edges.forEach(([from, to, weight]) => {
+        if (!ids.has(from) || !ids.has(to)) throw new Error(`Edge ${from}-${to} references unknown node.`);
+        if (!Number.isFinite(weight) || weight < 0) throw new Error(`Edge ${from}-${to} needs a non-negative weight.`);
+      });
+    }
+
+    function buildAdjacency(nodes, edges) {
+      const adj = Object.fromEntries(nodes.map((node) => [node.id, []]));
+      edges.forEach(([from, to, weight]) => {
+        adj[from].push({ to, weight });
+        adj[to].push({ to: from, weight });
+      });
+      return adj;
+    }
+
+    function generateEvents(nodes, edges, source) {
+      const adj = buildAdjacency(nodes, edges);
+      const dist = {};
+      const prev = {};
+      const settled = new Set();
+      const remaining = new Set(nodes.map((node) => node.id));
+      const events = [{ type: "init", distances: seedDistances(nodes, source), prev: seedPrev(nodes) }];
+
+      Object.assign(dist, events[0].distances);
+      Object.assign(prev, events[0].prev);
+
+      while (remaining.size) {
+        let current = null;
+        let best = Infinity;
+        for (const id of remaining) {
+          if (dist[id] < best) {
+            best = dist[id];
+            current = id;
+          }
+        }
+
+        if (current === null || best === Infinity) break;
+
+        events.push(snapshotEvent("select", { node: current }, dist, prev, settled));
+        remaining.delete(current);
+
+        for (const edge of adj[current]) {
+          if (settled.has(edge.to)) continue;
+          const candidate = dist[current] + edge.weight;
+          const improved = candidate < dist[edge.to];
+          events.push(snapshotEvent("consider", {
+            from: current,
+            to: edge.to,
+            weight: edge.weight,
+            candidate,
+            oldDistance: dist[edge.to],
+            improved
+          }, dist, prev, settled));
+
+          if (improved) {
+            dist[edge.to] = candidate;
+            prev[edge.to] = current;
+            events.push(snapshotEvent("update", {
+              node: edge.to,
+              via: current,
+              newDistance: candidate
+            }, dist, prev, settled));
+          }
+        }
+
+        settled.add(current);
+        events.push(snapshotEvent("finalize", { node: current }, dist, prev, settled));
+      }
+
+      events.push(snapshotEvent("done", { source }, dist, prev, settled));
+      return events;
+    }
+
+    function seedDistances(nodes, source) {
+      const distances = {};
+      nodes.forEach((node) => {
+        distances[node.id] = node.id === source ? 0 : Infinity;
+      });
+      return distances;
+    }
+
+    function seedPrev(nodes) {
+      const prev = {};
+      nodes.forEach((node) => {
+        prev[node.id] = null;
+      });
+      return prev;
+    }
+
+    function snapshotEvent(type, payload, distances, prev, settled) {
+      return {
+        type,
+        ...payload,
+        distances: { ...distances },
+        prev: { ...prev },
+        settled: Array.from(settled)
+      };
+    }
+
+    function getAppliedEvent() {
+      return state.events[Math.max(0, state.stepIndex - 1)] || state.events[0] || null;
+    }
+
+    function getCurrentSnapshot() {
+      return getAppliedEvent() || { distances: seedDistances(state.nodes, state.source), prev: seedPrev(state.nodes), settled: [] };
+    }
+
+    function getFinalSnapshot() {
+      return state.events.find((event) => event.type === "done") || getCurrentSnapshot();
+    }
+
+    function isAlgorithmDone() {
+      return state.stepIndex >= state.events.length || getAppliedEvent()?.type === "done";
+    }
+
+    function getCurrentNode() {
+      for (let index = state.stepIndex - 1; index >= 0; index -= 1) {
+        const event = state.events[index];
+        if (!event) continue;
+        if (event.type === "select") return event.node;
+        if (event.type === "finalize") return null;
+      }
+      return null;
+    }
+
+    function buildPath(target, prevMap) {
+      if (!target) return [];
+      const path = [target];
+      const seen = new Set(path);
+      while (prevMap[path[0]]) {
+        const next = prevMap[path[0]];
+        if (seen.has(next)) break;
+        path.unshift(next);
+        seen.add(next);
+      }
+      return path;
+    }
+
+    function formatDistance(value) {
+      return value === Infinity ? "∞" : String(value);
+    }
+
+    function renderSelectors() {
+      const options = state.nodes.map((node) => `<option value="${node.id}">${node.id} · ${node.label}</option>`).join("");
+      els.sourceSelect.innerHTML = options;
+      els.targetSelect.innerHTML = `<option value="">None</option>${options}`;
+      els.sourceSelect.value = state.source;
+      els.targetSelect.value = state.target || "";
+    }
+
+    function renderWorkflow() {
+      const activeType = getAppliedEvent()?.type || "init";
+      els.flowList.innerHTML = WORKFLOW_STEPS.map((step) => {
+        const isActive = activeType === step.key || (activeType === "update" && step.key === "update");
+        return `<div class="flow-step${isActive ? " active" : ""}">${step.text}</div>`;
+      }).join("");
+    }
+
+    function renderTable() {
+      const snapshot = getCurrentSnapshot();
+      const settled = new Set(snapshot.settled || []);
+      const current = getCurrentNode();
+
+      els.tableBody.innerHTML = state.nodes.map((node) => {
+        const status = node.id === current ? "current" : settled.has(node.id) ? "settled" : "pending";
+        return `
+          <tr>
+            <td><strong>${node.id}</strong><div class="mini">${node.label}</div></td>
+            <td>${formatDistance(snapshot.distances[node.id])}</td>
+            <td>${snapshot.prev[node.id] || "—"}</td>
+            <td><span class="state ${status}">${status}</span></td>
+          </tr>
+        `;
+      }).join("");
+    }
+
+    function eventMessage(event) {
+      if (!event) return { main: "Ready to simulate shortest-path routing.", sub: "Press play or step through each routing decision." };
+      if (event.type === "init") return { main: `Starting from ${state.source}.`, sub: "Source gets distance 0, every other node starts at infinity." };
+      if (event.type === "select") return { main: `Now visiting ${event.node}.`, sub: `${event.node} has the smallest tentative distance among unvisited nodes.` };
+      if (event.type === "consider") return {
+        main: `Checking road ${event.from} → ${event.to}.`,
+        sub: event.improved
+          ? `New route candidate ${event.candidate} beats ${formatDistance(event.oldDistance)}.`
+          : `Candidate ${event.candidate} does not beat ${formatDistance(event.oldDistance)}.`
+      };
+      if (event.type === "update") return { main: `Updated ${event.node}.`, sub: `Best known route now reaches ${event.node} via ${event.via} with cost ${event.newDistance}.` };
+      if (event.type === "finalize") return { main: `${event.node} is settled.`, sub: `Its shortest route is now confirmed and won't change again.` };
+      return { main: "Routing complete.", sub: "Choose any destination node to highlight its best route." };
+    }
+
+    function renderStatus() {
+      const snapshot = isAlgorithmDone() ? getFinalSnapshot() : getCurrentSnapshot();
+      const active = getAppliedEvent();
+      const target = state.selectedNode || state.target;
+      const message = eventMessage(active);
+      const path = target ? buildPath(target, snapshot.prev) : [];
+
+      els.statusMain.textContent = message.main;
+      els.statusSub.textContent = message.sub;
+      els.routeBadge.textContent = path.length > 1 ? `Route: ${path.join(" → ")}` : "Route: --";
+      els.distanceBadge.textContent = target ? `Distance: ${formatDistance(snapshot.distances[target])}` : "Distance: --";
+    }
+
+    function renderLog() {
+      const visible = state.events.slice(0, state.stepIndex).slice(-8).reverse();
+      els.logBox.innerHTML = visible.map((event) => {
+        const text = eventMessage(event);
+        return `<div class="log-item"><strong>${text.main}</strong><div class="mini" style="margin-top:4px;">${text.sub}</div></div>`;
+      }).join("") || `<div class="log-item">No events yet. Start the algorithm to see the routing log.</div>`;
+    }
+
+    function toSvgPoint(node) {
+      return { x: node.x * 10, y: node.y * 7 };
+    }
+
+    function edgeKey(a, b) {
+      return [a, b].sort().join("|");
+    }
+
+    function edgeWallPoints(p1, p2, depth = 18) {
+      return [
+        `${p1.x},${p1.y}`,
+        `${p2.x},${p2.y}`,
+        `${p2.x},${p2.y + depth}`,
+        `${p1.x},${p1.y + depth}`
+      ].join(" ");
+    }
+
+    function renderMap() {
+      const snapshot = isAlgorithmDone() ? getFinalSnapshot() : getCurrentSnapshot();
+      const settled = new Set(snapshot.settled || []);
+      const current = getCurrentNode();
+      const lastEvent = getAppliedEvent();
+      const activeEdge = lastEvent && lastEvent.type === "consider" ? edgeKey(lastEvent.from, lastEvent.to) : null;
+      const target = state.selectedNode || state.target;
+      const pathNodes = new Set();
+      const pathEdges = new Set();
+      const path = target ? buildPath(target, snapshot.prev) : [];
+
+      path.forEach((nodeId, index) => {
+        pathNodes.add(nodeId);
+        if (index > 0) pathEdges.add(edgeKey(path[index - 1], nodeId));
+      });
+
+      const edgeMarkup = state.edges.map(([from, to, weight]) => {
+        const fromNode = state.nodes.find((node) => node.id === from);
+        const toNode = state.nodes.find((node) => node.id === to);
+        const p1 = toSvgPoint(fromNode);
+        const p2 = toSvgPoint(toNode);
+        const mx = (p1.x + p2.x) / 2;
+        const my = (p1.y + p2.y) / 2;
+        const finalClass = pathEdges.has(edgeKey(from, to)) ? 1 : 0;
+        const activeClass = activeEdge === edgeKey(from, to) ? 1 : 0;
+
+        return `
+          <g data-edge="${edgeKey(from, to)}">
+            <line class="road-shadow" x1="${p1.x}" y1="${p1.y + 10}" x2="${p2.x}" y2="${p2.y + 10}"></line>
+            <polygon class="road-wall" points="${edgeWallPoints(p1, p2, 18)}"></polygon>
+            <line class="road-depth" x1="${p1.x}" y1="${p1.y + 5}" x2="${p2.x}" y2="${p2.y + 5}"></line>
+            <line class="road-base" x1="${p1.x}" y1="${p1.y}" x2="${p2.x}" y2="${p2.y}"></line>
+            <line class="road-active" style="opacity:${activeClass};" x1="${p1.x}" y1="${p1.y}" x2="${p2.x}" y2="${p2.y}"></line>
+            <line class="road-final" style="opacity:${finalClass};" x1="${p1.x}" y1="${p1.y}" x2="${p2.x}" y2="${p2.y}"></line>
+          </g>
+        `;
+      }).join("");
+
+      const nodeMarkup = state.nodes.map((node) => {
+        const point = toSvgPoint(node);
+        const classes = [
+          "node",
+          node.id === current ? "current" : "",
+          settled.has(node.id) ? "settled" : "",
+          target === node.id ? "target" : ""
+        ].filter(Boolean).join(" ");
+        const showFocus = pathNodes.has(node.id) ? 1 : 0;
+        const columnHeight = 26;
+
+        return `
+          <g class="${classes}" data-node="${node.id}">
+            <ellipse class="node-base" cx="${point.x}" cy="${point.y + columnHeight}" rx="40" ry="12"></ellipse>
+            <rect class="node-side" x="${point.x - 24}" y="${point.y + 8}" width="48" height="${columnHeight - 8}" rx="12"></rect>
+            <rect class="node-column" x="${point.x - 24}" y="${point.y}" width="48" height="${columnHeight}" rx="16"></rect>
+            <circle class="focus-ring" style="opacity:${showFocus};" cx="${point.x}" cy="${point.y}" r="28"></circle>
+            <circle class="node-body" cx="${point.x}" cy="${point.y}" r="24"></circle>
+            <circle class="node-rim" cx="${point.x}" cy="${point.y}" r="20"></circle>
+            <ellipse class="node-cap" cx="${point.x - 7}" cy="${point.y - 7}" rx="9" ry="5"></ellipse>
+          </g>
+        `;
+      }).join("");
+
+      const edgeLabelMarkup = state.edges.map(([from, to, weight]) => {
+        const fromNode = state.nodes.find((node) => node.id === from);
+        const toNode = state.nodes.find((node) => node.id === to);
+        const p1 = toSvgPoint(fromNode);
+        const p2 = toSvgPoint(toNode);
+        const mx = (p1.x + p2.x) / 2;
+        const my = (p1.y + p2.y) / 2 - 12;
+        return `
+          <g>
+            <rect class="edge-plate" x="${mx - 14}" y="${my - 12}" width="28" height="18" rx="9"></rect>
+            <text class="edge-label" x="${mx}" y="${my + 1}">${weight}</text>
+          </g>
+        `;
+      }).join("");
+
+      const nodeLabelMarkup = state.nodes.map((node) => {
+        const point = toSvgPoint(node);
+        const distance = formatDistance(snapshot.distances[node.id]);
+        return `
+          <g pointer-events="none">
+            <rect class="label-plate" x="${point.x - 24}" y="${point.y - 50}" width="48" height="24" rx="12"></rect>
+            <text class="node-label" x="${point.x}" y="${point.y - 34}">${node.id}</text>
+            <rect class="distance-plate" x="${point.x - 20}" y="${point.y + 28}" width="40" height="20" rx="10"></rect>
+            <text class="node-distance" x="${point.x}" y="${point.y + 42}">${distance}</text>
+          </g>
+        `;
+      }).join("");
+
+      els.mapSvg.innerHTML = `
+        <defs>
+          <linearGradient id="vehicleGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stop-color="#58d6ff"></stop>
+            <stop offset="100%" stop-color="#7b7cff"></stop>
+          </linearGradient>
+          <linearGradient id="groundGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stop-color="#10253d"></stop>
+            <stop offset="100%" stop-color="#0a1728"></stop>
+          </linearGradient>
+          <linearGradient id="roadGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stop-color="#415b7b"></stop>
+            <stop offset="100%" stop-color="#2a3c56"></stop>
+          </linearGradient>
+          <linearGradient id="nodeGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stop-color="#3b79a5"></stop>
+            <stop offset="45%" stop-color="#1d4367"></stop>
+            <stop offset="100%" stop-color="#11233c"></stop>
+          </linearGradient>
+          <linearGradient id="columnGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+            <stop offset="0%" stop-color="#193c5e"></stop>
+            <stop offset="100%" stop-color="#0b1b30"></stop>
+          </linearGradient>
+          <linearGradient id="nodeSideGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+            <stop offset="0%" stop-color="#173654"></stop>
+            <stop offset="100%" stop-color="#081626"></stop>
+          </linearGradient>
+        </defs>
+        <ellipse class="ground-shadow" cx="500" cy="590" rx="370" ry="72"></ellipse>
+        <rect class="ground-plane" x="110" y="110" width="780" height="470" rx="48"></rect>
+        <g>
+          ${Array.from({ length: 10 }, (_, index) => {
+            const x = 160 + index * 70;
+            return `<line class="ground-grid" x1="${x}" y1="120" x2="${x}" y2="570"></line>`;
+          }).join("")}
+          ${Array.from({ length: 6 }, (_, index) => {
+            const y = 150 + index * 70;
+            return `<line class="ground-grid" x1="130" y1="${y}" x2="870" y2="${y}"></line>`;
+          }).join("")}
+        </g>
+        ${edgeMarkup}
+        ${nodeMarkup}
+        ${edgeLabelMarkup}
+        ${nodeLabelMarkup}
+        <ellipse id="vehicleTrail" class="vehicle-trail" rx="18" ry="7"></ellipse>
+        <circle id="vehicleDot" class="vehicle" r="8" fill="url(#vehicleGradient)"></circle>
+      `;
+
+      els.mapSvg.querySelectorAll("[data-node]").forEach((element) => {
+        element.addEventListener("click", () => {
+          state.selectedNode = element.getAttribute("data-node");
+          renderAll();
+        });
+      });
+
+      updateVehicle();
+    }
+
+    function updateVehicle() {
+      const vehicle = document.getElementById("vehicleDot");
+      const trail = document.getElementById("vehicleTrail");
+      const event = getAppliedEvent();
+      if (!vehicle || !event || event.type !== "consider") {
+        if (vehicle) vehicle.style.opacity = 0;
+        if (trail) trail.style.opacity = 0;
+        return;
+      }
+
+      const fromNode = state.nodes.find((node) => node.id === event.from);
+      const toNode = state.nodes.find((node) => node.id === event.to);
+      if (!fromNode || !toNode) return;
+
+      const p1 = toSvgPoint(fromNode);
+      const p2 = toSvgPoint(toNode);
+      const t = state.vehicleOffset;
+      const cx = p1.x + (p2.x - p1.x) * t;
+      const cy = p1.y + (p2.y - p1.y) * t;
+      vehicle.setAttribute("cx", cx);
+      vehicle.setAttribute("cy", cy);
+      vehicle.style.opacity = 1;
+      if (trail) {
+        trail.setAttribute("cx", cx);
+        trail.setAttribute("cy", cy + 18);
+        trail.style.opacity = 1;
+      }
+    }
+
+    function renderAll() {
+      renderSelectors();
+      renderWorkflow();
+      renderTable();
+      renderStatus();
+      renderLog();
+      renderMap();
+      applyStageTransform();
+    }
+
+    function resetPlayback() {
+      clearInterval(state.timer);
+      state.playing = false;
+      state.stepIndex = 0;
+      state.vehicleOffset = 0;
+      els.playBtn.textContent = "Play";
+      renderAll();
+    }
+
+    function stepForward() {
+      if (state.stepIndex >= state.events.length) {
+        clearInterval(state.timer);
+        state.playing = false;
+        els.playBtn.textContent = "Play";
+        return;
+      }
+
+      state.stepIndex += 1;
+      state.vehicleOffset = 0;
+      if (state.stepIndex >= state.events.length && state.target) {
+        state.selectedNode = state.target;
+      }
+      renderAll();
+    }
+
+    function startPlayback() {
+      clearInterval(state.timer);
+      state.playing = true;
+      els.playBtn.textContent = "Pause";
+
+      const delay = 1100 - Number(els.speedRange.value) * 85;
+      state.timer = setInterval(() => {
+        stepForward();
+        const currentEvent = getAppliedEvent();
+        if (currentEvent && currentEvent.type === "consider") {
+          animateVehicle(delay * 0.8);
+        }
+        if (state.stepIndex >= state.events.length) {
+          clearInterval(state.timer);
+          state.playing = false;
+          els.playBtn.textContent = "Play";
+        }
+      }, Math.max(180, delay));
+    }
+
+    function animateVehicle(duration) {
+      const event = getAppliedEvent();
+      if (!event || event.type !== "consider") return;
+
+      const startedAt = performance.now();
+      const tick = (now) => {
+        const progress = Math.min(1, (now - startedAt) / duration);
+        state.vehicleOffset = progress;
+        updateVehicle();
+        if (progress < 1 && state.playing) requestAnimationFrame(tick);
+      };
+      requestAnimationFrame(tick);
+    }
+
+    function applyGraphFromInputs() {
+      try {
+        const nodes = parseNodesInput(els.nodesInput.value);
+        const edges = parseEdgesInput(els.edgesInput.value);
+        validateGraph(nodes, edges);
+        state.nodes = nodes;
+        state.edges = edges;
+        if (!nodes.some((node) => node.id === state.source)) state.source = nodes[0].id;
+        if (!nodes.some((node) => node.id === state.target)) state.target = nodes[nodes.length - 1].id;
+        state.selectedNode = state.target;
+        state.events = generateEvents(state.nodes, state.edges, state.source);
+        els.nodesInput.value = formatNodesForInput(nodes);
+        els.edgesInput.value = formatEdgesForInput(edges);
+        resetPlayback();
+      } catch (error) {
+        alert(error.message);
+      }
+    }
+
+    function rebuildFromSelectors() {
+      state.source = els.sourceSelect.value;
+      state.target = els.targetSelect.value || "";
+      state.selectedNode = state.target;
+      state.events = generateEvents(state.nodes, state.edges, state.source);
+      resetPlayback();
+    }
+
+    function focusTarget() {
+      const target = state.selectedNode || state.target;
+      if (!target) return;
+      state.lastFocusNode = target;
+       state.mapScale = 1.02;
+       state.liftZ = 12;
+       setTimeout(() => {
+         state.mapScale = 0.96;
+         state.liftZ = 0;
+         applyStageTransform();
+       }, 260);
+      renderAll();
+    }
+
+    function bindMapDrag() {
+      const stage = els.mapStage;
+      if (!stage) return;
+
+      stage.addEventListener("pointerdown", (event) => {
+        if (event.target.closest("button, input, select, textarea")) return;
+        state.drag.active = true;
+        state.drag.startX = event.clientX;
+        state.drag.startY = event.clientY;
+        state.drag.startTiltX = state.tiltX;
+        state.drag.startTiltZ = state.tiltZ;
+        state.mapScale = 1.01;
+        state.liftZ = 10;
+        stage.style.cursor = "grabbing";
+        stage.setPointerCapture(event.pointerId);
+        showDragHint("Rotate view freely");
+        applyStageTransform();
+      });
+
+      stage.addEventListener("pointermove", (event) => {
+        if (!state.drag.active) return;
+        const deltaX = event.clientX - state.drag.startX;
+        const deltaY = event.clientY - state.drag.startY;
+        state.tiltZ = clamp(state.drag.startTiltZ + deltaX * 0.12, -50, 50);
+        state.tiltX = clamp(state.drag.startTiltX - deltaY * 0.12, 28, 85);
+        applyStageTransform();
+      });
+
+      const endDrag = (event) => {
+        if (!state.drag.active) return;
+        state.drag.active = false;
+        state.mapScale = 0.96;
+        state.liftZ = 0;
+        stage.style.cursor = "grab";
+        if (event?.pointerId !== undefined) {
+          try { stage.releasePointerCapture(event.pointerId); } catch (error) {}
+        }
+        showDragHint("Drag map to rotate");
+        applyStageTransform();
+      };
+
+      stage.addEventListener("pointerup", endDrag);
+      stage.addEventListener("pointercancel", endDrag);
+      stage.addEventListener("mouseleave", () => {
+        if (!state.drag.active) showDragHint("Drag map to rotate");
+      });
+    }
+
+    function bindEvents() {
+      els.playBtn.addEventListener("click", () => {
+        if (state.playing) {
+          clearInterval(state.timer);
+          state.playing = false;
+          els.playBtn.textContent = "Play";
+          return;
+        }
+        startPlayback();
+      });
+
+      els.stepBtn.addEventListener("click", () => {
+        clearInterval(state.timer);
+        state.playing = false;
+        els.playBtn.textContent = "Play";
+        stepForward();
+        const currentEvent = getAppliedEvent();
+        if (currentEvent && currentEvent.type === "consider") animateVehicle(520);
+      });
+
+      els.resetBtn.addEventListener("click", resetPlayback);
+      els.applyBtn.addEventListener("click", applyGraphFromInputs);
+      els.presetBtn.addEventListener("click", () => {
+        initializeInputs();
+        state.source = "A";
+        state.target = "I";
+        applyGraphFromInputs();
+      });
+      els.focusTargetBtn.addEventListener("click", focusTarget);
+      els.sourceSelect.addEventListener("change", rebuildFromSelectors);
+      els.targetSelect.addEventListener("change", rebuildFromSelectors);
+      els.speedRange.addEventListener("change", () => {
+        if (state.playing) startPlayback();
+      });
+      els.tiltXRange.addEventListener("input", () => {
+        state.tiltX = Number(els.tiltXRange.value);
+        applyStageTransform();
+      });
+      els.tiltZRange.addEventListener("input", () => {
+        state.tiltZ = Number(els.tiltZRange.value);
+        applyStageTransform();
+      });
+      bindMapDrag();
+    }
+
+    function boot() {
+      initializeInputs();
+      state.nodes = deepClone(DEFAULT_NODES);
+      state.edges = deepClone(DEFAULT_EDGES);
+      state.selectedNode = state.target;
+      state.events = generateEvents(state.nodes, state.edges, state.source);
+      bindEvents();
+      renderAll();
+    }
+
+    boot();
+  </script>
+</body>
+</html>
